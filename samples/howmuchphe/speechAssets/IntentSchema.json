@@ -1,0 +1,28 @@
+{
+  "intents": [
+    {
+      "intent": "ListFavoritesIntent"
+    },
+    {
+      "intent": "RecordIntent",
+      "slots": [
+        {
+          "name": "Quantity",
+          "type": "AMAZON.NUMBER"
+        },
+        {
+          "name": "Unit",
+          "type": "LIST_OF_UNITS"
+        },
+        {
+          "name": "FavItem",
+          "type": "LIST_OF_FAVORITES"
+        },
+        {
+          "name": "Name",
+          "type": "LIST_OF_NAMES"
+        }
+      ]
+    }
+  ]
+}

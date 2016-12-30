@@ -1,0 +1,3 @@
+ListFavoritesIntent list favorites
+
+RecordIntent record {Quantity} {Unit} of {FavItem} for {Name}

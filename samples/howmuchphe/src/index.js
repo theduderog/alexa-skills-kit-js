@@ -16,7 +16,9 @@
 // Route the incoming request based on type (LaunchRequest, IntentRequest,
 // etc.) The JSON body of the request is provided in the event parameter.
 exports.handler = function (event, context) {
+    var APP_ID = "amzn1.ask.skill.5f59a48b-390e-4ed3-913a-0238b59af26d";
     try {
+        //console.log(event);
         console.log("event.session.application.applicationId=" + event.session.application.applicationId);
 
         /**
@@ -24,9 +26,9 @@ exports.handler = function (event, context) {
          * prevent someone else from configuring a skill that sends requests to this function.
          */
 
-//     if (event.session.application.applicationId !== "amzn1.echo-sdk-ams.app.05aecccb3-1461-48fb-a008-822ddrt6b516") {
-//         context.fail("Invalid Application ID");
-//      }
+        if (event.session.application.applicationId !== APP_ID) {
+            context.fail("Invalid Application ID");
+         }
 
         if (event.session.new) {
             onSessionStarted({requestId: event.request.requestId}, event.session);
@@ -89,10 +91,8 @@ function onIntent(intentRequest, session, callback) {
     } else if ("RecordIntent" === intentName) {
         handleRecordRequest(intent, session, callback);
     } else if ("AMAZON.RepeatIntent" === intentName) {
-        //TODO
         handleRepeatRequest(intent, session, callback);
     } else if ("AMAZON.HelpIntent" === intentName) {
-        //TODO
         handleGetHelpRequest(intent, session, callback);
     } else if ("AMAZON.StopIntent" === intentName) {
         handleFinishSessionRequest(intent, session, callback);
@@ -151,7 +151,7 @@ function handleRecordRequest(intent, session, callback) {
     console.log("item: " + intent.slots.FavItem.value);
     console.log("name: " + intent.slots.Name.value);
 
-    speechOutput = "Recorded " + quantity + " " unit " of " + item + " for " name + ".";
+    speechOutput = "Recorded " + quantity + " " + unit + " of " + item + " for " + name + ".";
     repromptText = speechOutput;
     callback(sessionAttributes,
         buildSpeechletResponse(CARD_TITLE, speechOutput, repromptText, shouldEndSession));
@@ -167,7 +167,7 @@ function handleRepeatRequest(intent, session, callback) {
     // Repeat the previous speechOutput and repromptText from the session attributes if available
     // else start a new game session
     if (!session.attributes || !session.attributes.speechOutput) {
-        getWelcomeResponse(callback);
+        handleStart(callback);
     } else {
         callback(session.attributes,
             buildSpeechletResponseWithoutCard(session.attributes.speechOutput, session.attributes.repromptText, false));
@@ -179,9 +179,6 @@ function handleGetHelpRequest(intent, session, callback) {
     if (!session.attributes) {
         session.attributes = {};
     }
-
-    // Set a flag to track that we're in the Help state.
-    session.attributes.userPromptedToContinue = true;
 
     var speechOutput = "Tell me to record phe or to list favorites.",
         repromptText = speechOutput,

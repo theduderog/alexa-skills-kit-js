@@ -55,9 +55,10 @@ HMPClient.prototype.login = function () {
         'LoginForm[password]': this._password,
         'LoginForm[rememberMe]': 0
     })
+    .followRedirect(false)
     .end(function (response) {
         if (response.code !== 200) {
-            console.log(response.body);
+            console.log(response);
             deferred.reject("Login failed with bad status code: " + response.code);
             return;
         }
@@ -65,7 +66,33 @@ HMPClient.prototype.login = function () {
             deferred.reject("No cookie found");
             return;
         }
+        console.log('Logged in: ' + response.cookies[COOKIE_NAME]);
         deferred.resolve(response.cookies[COOKIE_NAME]);
+    });
+
+    return deferred.promise;
+};
+
+HMPClient.prototype.logout = function (sessionId) {
+    var deferred = Q.defer();
+
+    unirest.get('https://howmuchphe.org/site/logout')
+    .headers({
+        'Accept': '*/*',
+        'Host': HOST,
+        'Referer': REFERER,
+        'User-Agent': USER_AGENT,
+        'Cookie': COOKIE_NAME + '=' + sessionId,
+    })
+    .followRedirect(false)
+    .end(function (response) {
+        if (response.code !== 302) {
+            console.log(response);
+            deferred.reject("Logout failed with bad status code: " + response.code);
+            return;
+        }
+        console.log('Logged out: ' + sessionId);
+        deferred.resolve(true);
     });
 
     return deferred.promise;
@@ -90,7 +117,8 @@ HMPClient.prototype.login = function () {
         proteinequiv
 */
 HMPClient.prototype._createEntry = function (sessionId, data) {
-    var deferred = Q.defer();
+    var that = this,
+        deferred = Q.defer();
 
     unirest.post('https://howmuchphe.org/Tracking/Create')
     .headers({
@@ -113,12 +141,14 @@ HMPClient.prototype._createEntry = function (sessionId, data) {
         'Tracking[calories]': '90',
         'Tracking[serv_weight_grams]': '22g'
     })
+    .followRedirect(false)
     .end(function (response) {
         if (response.code !== 200) {
-            console.log(response.body);
+            console.log(response);
             deferred.reject("Create failed with bad status code: " + response.code);
             return;
         }
+        console.log('Added entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + that._profileId +']: ' + JSON.stringify(data));
         deferred.resolve(data);
     });
 

@@ -42,6 +42,8 @@ proteinequiv
 HMPClient.prototype.login = function () {
     var deferred = Q.defer();
 
+    console.log('Logging in email [' + this._email + ']');
+
     unirest.post('https://howmuchphe.org/site/login')
     .headers({
         'Accept': '*/*',
@@ -66,7 +68,8 @@ HMPClient.prototype.login = function () {
             deferred.reject("No cookie found");
             return;
         }
-        console.log('Logged in: ' + response.cookies[COOKIE_NAME]);
+        console.log('Logged in sessionId [' + response.cookies[COOKIE_NAME] + ']');
+
         deferred.resolve(response.cookies[COOKIE_NAME]);
     });
 
@@ -74,7 +77,10 @@ HMPClient.prototype.login = function () {
 };
 
 HMPClient.prototype.logout = function (sessionId) {
-    var deferred = Q.defer();
+    var that = this,
+        deferred = Q.defer();
+
+    console.log('Logging out sessionId [' + sessionId + ']');
 
     unirest.get('https://howmuchphe.org/site/logout')
     .headers({
@@ -91,7 +97,7 @@ HMPClient.prototype.logout = function (sessionId) {
             deferred.reject("Logout failed with bad status code: " + response.code);
             return;
         }
-        console.log('Logged out: ' + sessionId);
+        console.log('Logged out sessionId [' + sessionId + ']');
         deferred.resolve(true);
     });
 
@@ -119,6 +125,8 @@ HMPClient.prototype.logout = function (sessionId) {
 HMPClient.prototype._createEntry = function (sessionId, data) {
     var that = this,
         deferred = Q.defer();
+
+    console.log('Adding entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + that._profileId +']: ' + JSON.stringify(data));
 
     unirest.post('https://howmuchphe.org/Tracking/Create')
     .headers({

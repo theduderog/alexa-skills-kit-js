@@ -2,6 +2,7 @@
 
 var unirest = require('unirest');
 var Q = require('q');
+var cheerio = require('cheerio');
 
 var COOKIE_NAME = 'PHPSESSID',
     HOST = 'howmuchphe.org',
@@ -9,34 +10,59 @@ var COOKIE_NAME = 'PHPSESSID',
     REFERER = ORIGIN,
     USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.95 Safari/537.36';
 
-function HMPClient(email, password, userId, profileId, favorites) {
+function HMPClient(email, password, userId, profileId) {
     this._email= email;
     this._password = password;
     this._userId = userId;
     this._profileId = profileId;
-    this._favorites = favorites;
 
     this._voiceShortcuts = {
-        'rice crispy treat': '54973'
+        'rice crispy treats': '54973'
     };
 
-    this._favorites = {
-        '54973': {
+    /*
+        servingSize - units per serving
+        weight - grams per serving
+        protein - protein per serving
+        phe - mg phe per serving
+        calories - calories per serving
+        proteinequiv - protein equivs per serving
+    */
+    this._foods = {};
+}
 
-        }
-    };
-/*
-foodId
-voiceShortcut
-servingSize
-weight
-protein
-phe
-exchanges
-phe_g
-calories
-proteinequiv
-*/
+HMPClient.prototype.calculateEntry = function (shortcut, quantityStr, unit) {
+    var foodId = this._voiceShortcuts[shortcut],
+        servingData, quantity, servings;
+    if (!foodId) {
+        throw 'Unknown voice shortcut: ' + shortcut;
+    }
+    servingData = this._foods[foodId];
+    if (!quantityStr) {
+        throw 'Missing quantity information';
+    }
+    quantity = Number.parseFloat(quantityStr);
+    if (Number.isNaN(quantity)) {
+        throw 'Bad quantity: ' + quantityStr;
+    }
+    if (unit === 'gram' || unit === 'grams') {
+        //quantity is in grams
+        servings = quantity / servingData.weight;
+    }
+    else if (unit === 'unit' || unit === 'units') {
+        //quantity is in servings
+        servings = quantity;
+    }
+    return {
+        foodId: foodId,
+        measureId: '2',
+        serving: servings,
+        phe: servings * servingData.phe,
+        protein: servings * servingData.protein,
+        calories: servings * servingData.calories,
+        proteinequiv: servings * servingData.proteinequiv,
+        serv_weight_grams: servings * servingData.weight
+    }
 }
 
 HMPClient.prototype.login = function () {
@@ -104,24 +130,66 @@ HMPClient.prototype.logout = function (sessionId) {
     return deferred.promise;
 };
 
-/*
-    Required entry fields
-        quantity
-        unit
-        foodId
+HMPClient.prototype._cacheFood = function (sessionId, shortcut) {
+    var that = this,
+        foodId = this._voiceShortcuts[shortcut];
+    if (!foodId) {
+        throw 'Unknown voice shortcut: ' + shortcut;
+    }
+    return that._fetchEntry(sessionId, foodId).then(function (data) {
+        that._foods[foodId] = data;
+    });
+}
 
-    Required food item fields:
-        foodId
-        voiceShortcut
-        servingSize
-        weight
-        protein
-        phe
-        exchanges
-        phe_g
-        calories
-        proteinequiv
-*/
+HMPClient.prototype._fetchEntry = function (sessionId, foodId) {
+    var that = this,
+        deferred = Q.defer();
+
+    console.log('Fetching entry with sessionId [' + sessionId + '] and foodId [' + foodId + ']');
+
+    unirest.get('https://howmuchphe.org/food/view/' + foodId)
+    .headers({
+        'Accept': '*/*',
+        'Host': HOST,
+        'Origin': ORIGIN,
+        'Referer': REFERER,
+        'User-Agent': USER_AGENT,
+        'Cookie': COOKIE_NAME + '=' + sessionId,
+    })
+    .followRedirect(false)
+    .end(function (response) {
+        if (response.code !== 200) {
+            console.log(response);
+            deferred.reject("Fetch failed with bad status code: " + response.code);
+            return;
+        }
+        var data = that._scrapeEntry(response.body);
+        console.log('Fetched entry with sessionId [' + sessionId + '] and foodId [' + foodId + ']: ' + JSON.stringify(data));
+        deferred.resolve(data);
+    });
+
+    return deferred.promise;
+};
+
+function numFromTable(table, id) {
+    return Number.parseFloat(table.find('tr#' + id + ' td.value').text());
+}
+
+HMPClient.prototype._scrapeEntry = function (html) {
+    var $ = cheerio.load(html),
+        table = $('table#hmp-data');
+
+    // console.log(table.html());
+    return {
+        servingSize: numFromTable(table, 'servingSize'),
+        weight: numFromTable(table, 'weight'),
+        protein: numFromTable(table, 'protein'),
+        phe: numFromTable(table, 'phe'),
+        calories: numFromTable(table, 'calories'),
+        proteinequiv: numFromTable(table, 'proteinequiv')
+    };
+};
+
 HMPClient.prototype._createEntry = function (sessionId, data) {
     var that = this,
         deferred = Q.defer();
@@ -140,14 +208,14 @@ HMPClient.prototype._createEntry = function (sessionId, data) {
     .send({
         'Tracking[userId]': this._userId,
         'Tracking[profileId]': this._profileId,
-        'Tracking[foodId]': '54973',
-        'Tracking[measureId]': '2',
-        'Tracking[proteinequiv]': '0g',
-        'Tracking[serving]': '1',
-        'Tracking[phe]': '26mg',
-        'Tracking[protein]': '0.6g',
-        'Tracking[calories]': '90',
-        'Tracking[serv_weight_grams]': '22g'
+        'Tracking[foodId]': data.foodId,
+        'Tracking[measureId]': data.measureId,
+        'Tracking[proteinequiv]': data.proteinequiv + 'g',
+        'Tracking[serving]': data.serving,
+        'Tracking[phe]': data.phe + 'mg',
+        'Tracking[protein]': data.protein + 'g',
+        'Tracking[calories]': data.calories,
+        'Tracking[serv_weight_grams]': data.serv_weight_grams + 'g'
     })
     .followRedirect(false)
     .end(function (response) {

@@ -10,11 +10,10 @@ var COOKIE_NAME = 'PHPSESSID',
     REFERER = ORIGIN,
     USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.95 Safari/537.36';
 
-function HMPClient(email, password, userId, profileId) {
+function HMPClient(email, password, userId) {
     this._email= email;
     this._password = password;
     this._userId = userId;
-    this._profileId = profileId;
 
     this._voiceShortcuts = {
         'rice crispy treats': '54973'
@@ -190,11 +189,11 @@ HMPClient.prototype._scrapeEntry = function (html) {
     };
 };
 
-HMPClient.prototype._createEntry = function (sessionId, data) {
+HMPClient.prototype._createEntry = function (sessionId, profileId, data) {
     var that = this,
         deferred = Q.defer();
 
-    console.log('Adding entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + that._profileId +']: ' + JSON.stringify(data));
+    console.log('Adding entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + profileId +']: ' + JSON.stringify(data));
 
     unirest.post('https://howmuchphe.org/Tracking/Create')
     .headers({
@@ -207,7 +206,7 @@ HMPClient.prototype._createEntry = function (sessionId, data) {
     })
     .send({
         'Tracking[userId]': this._userId,
-        'Tracking[profileId]': this._profileId,
+        'Tracking[profileId]': profileId,
         'Tracking[foodId]': data.foodId,
         'Tracking[measureId]': data.measureId,
         'Tracking[proteinequiv]': data.proteinequiv + 'g',
@@ -224,7 +223,7 @@ HMPClient.prototype._createEntry = function (sessionId, data) {
             deferred.reject("Create failed with bad status code: " + response.code);
             return;
         }
-        console.log('Added entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + that._profileId +']: ' + JSON.stringify(data));
+        console.log('Added entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + profileId +']: ' + JSON.stringify(data));
         deferred.resolve(data);
     });
 

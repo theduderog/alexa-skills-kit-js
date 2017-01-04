@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "cheerio": "^0.22.0",
+    "lodash": "^4.17.4",
     "q": "^1.4.1",
     "unirest": "^0.5.1"
   }

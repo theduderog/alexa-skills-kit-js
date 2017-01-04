@@ -3,6 +3,7 @@
 var unirest = require('unirest');
 var Q = require('q');
 var cheerio = require('cheerio');
+var _ = require('lodash');
 
 var COOKIE_NAME = 'PHPSESSID',
     HOST = 'howmuchphe.org',
@@ -27,16 +28,22 @@ function HMPClient(email, password, userId) {
         calories - calories per serving
         proteinequiv - protein equivs per serving
     */
-    this._foods = {};
+    this._foodCache = {};
+    this._writeId = 0;
+    this._outstandingWrites = {};
+}
+
+HMPClient.prototype.stop = function () {
+    this._foodCache = {};
+    return Q.allSettled(_.values(this._outstandingWrites));
 }
 
 HMPClient.prototype.calculateEntry = function (shortcut, quantityStr, unit) {
     var foodId = this._voiceShortcuts[shortcut],
-        servingData, quantity, servings;
+        quantity, servings;
     if (!foodId) {
         throw 'Unknown voice shortcut: ' + shortcut;
     }
-    servingData = this._foods[foodId];
     if (!quantityStr) {
         throw 'Missing quantity information';
     }
@@ -48,20 +55,43 @@ HMPClient.prototype.calculateEntry = function (shortcut, quantityStr, unit) {
         //quantity is in grams
         servings = quantity / servingData.weight;
     }
-    else if (unit === 'unit' || unit === 'units') {
+    else if (unit === 'unit' || unit === 'units' || unit === 'piece' || unit === 'pieces') {
         //quantity is in servings
         servings = quantity;
     }
-    return {
-        foodId: foodId,
-        measureId: '2',
-        serving: servings,
-        phe: servings * servingData.phe,
-        protein: servings * servingData.protein,
-        calories: servings * servingData.calories,
-        proteinequiv: servings * servingData.proteinequiv,
-        serv_weight_grams: servings * servingData.weight
+    else {
+        throw "Unknown unit: " + unit;
     }
+    return this._foodCache[foodId].then(function (servingData) {
+        return {
+            foodId: foodId,
+            measureId: '2',
+            serving: servings,
+            phe: servings * servingData.phe,
+            protein: servings * servingData.protein,
+            calories: servings * servingData.calories,
+            proteinequiv: servings * servingData.proteinequiv,
+            serv_weight_grams: servings * servingData.weight
+        }
+    });
+}
+
+HMPClient.prototype.createEntry = function (sessionId, profileId, data) {
+    var that = this,
+        writeId;
+
+    this._writeId += 1;
+    writeId = this._writeId.toString();
+    this._outstandingWrites[writeId] = this._createEntry(sessionId, profileId, data).then(
+        function (result) {
+            delete that._outstandingWrites[writeId];
+            return result;
+        },
+        function (error) {
+            delete that._outstandingWrites[writeId];
+            return error;
+        }
+    );
 }
 
 HMPClient.prototype.login = function () {
@@ -129,14 +159,12 @@ HMPClient.prototype.logout = function (sessionId) {
     return deferred.promise;
 };
 
-HMPClient.prototype._cacheFood = function (sessionId, shortcut) {
-    var that = this,
-        foodId = this._voiceShortcuts[shortcut];
-    if (!foodId) {
-        throw 'Unknown voice shortcut: ' + shortcut;
-    }
-    return that._fetchEntry(sessionId, foodId).then(function (data) {
-        that._foods[foodId] = data;
+HMPClient.prototype.startCaching = function (sessionId) {
+    var that = this;
+
+    Object.keys(this._voiceShortcuts).forEach(function (shortcut) {
+        let foodId = that._voiceShortcuts[shortcut];
+        that._foodCache[foodId] = that._fetchEntry(sessionId, foodId);
     });
 }
 

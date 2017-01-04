@@ -17,7 +17,23 @@ function HMPClient(email, password, userId) {
     this._userId = userId;
 
     this._voiceShortcuts = {
-        'rice crispy treats': '54973'
+        'rice crispy treats': '54973',
+        'american cheese singles': '54366',
+        'banana bread': '62263',
+        'nutty butter': '61147',
+        'biscuits': '62035',
+        'broccoli': '53251',
+        'coconut milk': '51340',
+        'cucumbers': '53287',
+        'french fries': '52382',
+        'waffles': '51667',
+        'cambrooke bread': '54336',
+        'oatmeal': '57422',
+        'pasta': '62040',
+        'seaweed': '52978',
+        'rice': '62003',
+        'skinny pop': '61891',
+        'spinach': '53355'
     };
 
     /*

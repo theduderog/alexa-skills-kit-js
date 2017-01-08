@@ -267,9 +267,6 @@ HMPClient.prototype._createEntry = function (sessionId, profileId, data) {
 
     console.log('Adding entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + profileId +']: ' + JSON.stringify(data));
 
-    deferred.resolve(data);
-    return deferred.promise;
-
     unirest.post('https://howmuchphe.org/Tracking/Create')
     .headers({
         'Accept': '*/*',

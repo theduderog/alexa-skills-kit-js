@@ -53,6 +53,10 @@ function HMPClient(email, password, userId) {
     this._outstandingWrites = {};
 }
 
+HMPClient.prototype.getShortcuts = function () {
+    return Object.keys(this._voiceShortcuts);
+}
+
 HMPClient.prototype.stop = function () {
     this._running = false;
     this._foodCache = {};

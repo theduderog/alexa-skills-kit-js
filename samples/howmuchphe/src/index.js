@@ -13,6 +13,9 @@
 
 'use strict';
 
+var HMPClient = require('./hmp'),
+    hmp;
+
 // Route the incoming request based on type (LaunchRequest, IntentRequest,
 // etc.) The JSON body of the request is provided in the event parameter.
 exports.handler = function (event, context) {
@@ -62,7 +65,7 @@ function onSessionStarted(sessionStartedRequest, session) {
     console.log("onSessionStarted requestId=" + sessionStartedRequest.requestId
         + ", sessionId=" + session.sessionId);
 
-    // add any session init logic here
+    handleStart();
 }
 
 /**
@@ -72,7 +75,7 @@ function onLaunch(launchRequest, session, callback) {
     console.log("onLaunch requestId=" + launchRequest.requestId
         + ", sessionId=" + session.sessionId);
 
-    handleStart(callback);
+    handleLaunch(callback);
 }
 
 /**
@@ -86,8 +89,10 @@ function onIntent(intentRequest, session, callback) {
         intentName = intentRequest.intent.name;
 
     // dispatch custom intents to handlers here
-    if ("ListFavoritesIntent" === intentName) {
-        handleListFavoritesRequest(intent, session, callback);
+    if ("ListShortcutsIntent" === intentName) {
+        handleListShortcutsRequest(intent, session, callback);
+    } else if ("SetProfileIntent" === intentName) {
+        handleSetProfileRequest(intent, session, callback);
     } else if ("RecordIntent" === intentName) {
         handleRecordRequest(intent, session, callback);
     } else if ("AMAZON.RepeatIntent" === intentName) {
@@ -118,16 +123,51 @@ function onSessionEnded(sessionEndedRequest, session) {
 
 var CARD_TITLE = "How Much Phe"; // Be sure to change this for your skill.
 
-function handleStart(callback) {
+function handleStart() {
+    if (!process.env.HMP_EMAIL) {
+        throw "Missing HMP_EMAIL env var";
+    }
+    if (!process.env.HMP_PASSWORD) {
+        throw "Missing HMP_PASSWORD env var";
+    }
+    if (!process.env.HMP_USER_ID) {
+        throw "Missing HMP_USER_ID env var";
+    }
+    hmp = new HMPClient(process.env.HMP_EMAIL, process.env.HMP_PASSWORD, process.env.HMP_USER_ID);
+}
+
+function handleLaunch(callback) {
     var sessionAttributes = {},
         speechOutput = "Ready to record phe.",
+        repromptText = speechOutput,
+        shouldEndSession = false;
+    hmp.login().then(
+        function (sessionId) {
+            sessionAttributes['hmpSessionId'] = sessionId;
+            callback(sessionAttributes,
+                buildSpeechletResponse(CARD_TITLE, speechOutput, repromptText, shouldEndSession));
+        },
+        function (error) {
+            speechOutput = "Could not login.";
+            repromptText = speechOutput;
+            shouldEndSession = true;
+            callback(sessionAttributes,
+                buildSpeechletResponse(CARD_TITLE, speechOutput, repromptText, shouldEndSession));
+        }
+    );
+}
+
+function handleSetProfileRequest(intent, session, callback) {
+    var sessionAttributes = {},
+        name = intent.slots.Name.value,
+        speechOutput = "These are the items you can tell me to record. Rice, Spinach, Waffles, and Oatmeal.",
         repromptText = speechOutput,
         shouldEndSession = false;
     callback(sessionAttributes,
         buildSpeechletResponse(CARD_TITLE, speechOutput, repromptText, shouldEndSession));
 }
 
-function handleListFavoritesRequest(intent, session, callback) {
+function handleListShortcutsRequest(intent, session, callback) {
     var sessionAttributes = {},
         speechOutput = "These are the items you can tell me to record. Rice, Spinach, Waffles, and Oatmeal.",
         repromptText = speechOutput,
@@ -140,8 +180,7 @@ function handleRecordRequest(intent, session, callback) {
     var sessionAttributes = {},
         quantity = intent.slots.Quantity.value,
         unit = intent.slots.Unit.value,
-        item = intent.slots.FavItem.value,
-        name = intent.slots.Name.value,
+        shortcut = intent.slots.Shortcut.value,
         shouldEndSession = false,
         speechOutput, repromptText;
 
@@ -167,7 +206,7 @@ function handleRepeatRequest(intent, session, callback) {
     // Repeat the previous speechOutput and repromptText from the session attributes if available
     // else start a new game session
     if (!session.attributes || !session.attributes.speechOutput) {
-        handleStart(callback);
+        handleLaunch(callback);
     } else {
         callback(session.attributes,
             buildSpeechletResponseWithoutCard(session.attributes.speechOutput, session.attributes.repromptText, false));

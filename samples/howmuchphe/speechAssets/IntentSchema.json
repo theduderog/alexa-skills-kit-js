@@ -1,7 +1,7 @@
 {
   "intents": [
     {
-      "intent": "ListFavoritesIntent"
+      "intent": "ListShortcutsIntent"
     },
     {
       "intent": "RecordIntent",
@@ -15,9 +15,14 @@
           "type": "LIST_OF_UNITS"
         },
         {
-          "name": "FavItem",
-          "type": "LIST_OF_FAVORITES"
-        },
+          "name": "Shortcut",
+          "type": "LIST_OF_SHORTCUTS"
+        }
+      ]
+    },
+    {
+      "intent": "SetProfileIntent",
+      "slots": [
         {
           "name": "Name",
           "type": "LIST_OF_NAMES"

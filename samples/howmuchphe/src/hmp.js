@@ -47,17 +47,19 @@ function HMPClient(email, password, userId) {
         calories - calories per serving
         proteinequiv - protein equivs per serving
     */
+    this._running = false;
     this._foodCache = {};
     this._writeId = 0;
     this._outstandingWrites = {};
 }
 
 HMPClient.prototype.stop = function () {
+    this._running = false;
     this._foodCache = {};
     return Q.allSettled(_.values(this._outstandingWrites));
 }
 
-HMPClient.prototype.calculateEntry = function (shortcut, quantityStr, unit) {
+HMPClient.prototype.calculateEntry = function (sessionId, shortcut, quantityStr, unit) {
     var foodId = this._voiceShortcuts[shortcut],
         quantity, servings;
     if (!foodId) {
@@ -80,6 +82,9 @@ HMPClient.prototype.calculateEntry = function (shortcut, quantityStr, unit) {
     }
     else {
         throw "Unknown unit: " + unit;
+    }
+    if (!this._foodCache[foodId]) {
+        this._foodCache[foodId] = this._fetchEntry(sessionId, foodId);
     }
     return this._foodCache[foodId].then(function (servingData) {
         return {
@@ -178,12 +183,28 @@ HMPClient.prototype.logout = function (sessionId) {
     return deferred.promise;
 };
 
-HMPClient.prototype.startCaching = function (sessionId) {
-    var that = this;
+HMPClient.prototype.start = function (sessionId) {
+    var that = this,
+        batchPromise = Q(null),
+        batches = _.chunk(Object.keys(this._voiceShortcuts), 3);
 
-    Object.keys(this._voiceShortcuts).forEach(function (shortcut) {
-        let foodId = that._voiceShortcuts[shortcut];
-        that._foodCache[foodId] = that._fetchEntry(sessionId, foodId);
+    this._running = true;
+    batches.forEach(function (batch) {
+        batchPromise = batchPromise.then(function() {
+            if (!that._running) {
+                console.log('Stopped caching');
+                return;
+            }
+            console.log('Fetching new batch: ' + batch);
+            let batchPromiseList = _.map(batch, function (shortcut) {
+                let foodId = that._voiceShortcuts[shortcut];
+                if (!that._foodCache[foodId]) {
+                    that._foodCache[foodId] = that._fetchEntry(sessionId, foodId);
+                }
+                return that._foodCache[foodId];
+            });
+            return Q.allSettled(batchPromiseList);
+        });
     });
 }
 

@@ -33,7 +33,10 @@ function HMPClient(email, password, userId) {
         'seaweed': '52978',
         'rice': '62003',
         'skinny pop': '61891',
-        'spinach': '53355'
+        'spinach': '53355',
+        'goldfish': '51465',
+        'olive oil': '55142',
+        'butter': '55132'
     };
 
     /*
@@ -202,7 +205,7 @@ HMPClient.prototype._fetchEntry = function (sessionId, foodId) {
     .followRedirect(false)
     .end(function (response) {
         if (response.code !== 200) {
-            console.log(response);
+            console.log('Fetched failed for sessionId [' + sessionId + '] and foodId [' + foodId + ']: ' + response.code);
             deferred.reject("Fetch failed with bad status code: " + response.code);
             return;
         }
@@ -237,7 +240,14 @@ HMPClient.prototype._createEntry = function (sessionId, profileId, data) {
     var that = this,
         deferred = Q.defer();
 
+    if (Object.keys(data).length < 8) {
+        throw "Bad data: " + JSON.stringify(data);
+    }
+
     console.log('Adding entry with sessionId [' + sessionId + '], userId [' + that._userId + '], profileId [' + profileId +']: ' + JSON.stringify(data));
+
+    deferred.resolve(data);
+    return deferred.promise;
 
     unirest.post('https://howmuchphe.org/Tracking/Create')
     .headers({
